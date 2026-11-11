@@ -1,7 +1,7 @@
 # sqlproject
 An sql project repository containing all parts from the ASSIGNMENT 3 of CSCI-341.
 
-#PART 1  — Required database constraints
+# PART 1  — Required database constraints
 • Define primary keys, foreign keys, and appropriate NOT NULL constraints. Enforce unique user
 emails, unique author positions within each paper, and at most one review per reviewer and
 paper. Store completed reviews only.
