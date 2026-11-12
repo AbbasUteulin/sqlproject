@@ -184,3 +184,26 @@ CREATE TABLE REVIEW (
 	CONSTRAINT recommendation_status CHECK (recommendation = 'accept' OR recommendation = 'reject'),
 	CONSTRAINT one_to_five CHECK (overall_score BETWEEN 1 AND 5)
 );
+
+CREATE OR REPLACE FUNCTION  self_review_check()
+RETURNS trigger AS $$
+BEGIN
+		IF EXISTS(
+			SELECT 1 FROM PAPER_AUTHOR
+			WHERE paper_id = NEW.paper_id
+			AND
+			author_id = NEW.reviewer_id
+		)
+		THEN RAISE EXCEPTION 'authors cannot self-review';
+		END IF;
+		return NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER self_review_trigger
+BEFORE INSERT OR UPDATE OF reviewer_id, paper_id
+ON REVIEW
+FOR EACH ROW
+EXECUTE FUNCTION self_review_check();
+
+
