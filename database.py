@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
 
+#The main file for the remaining sql queries. Creates empty tables.
 #The general connection URL IS: postgresql+psycopg2://user:pass@localhost:port/mydb
 #default port: 5432
 #default mydb name = postgres
@@ -12,8 +12,9 @@ engine = create_engine(
     echo=True,
 )
 
-with Session(engine) as session:
+with engine.connect() as conn:
     with open("sql1.sql") as file:
         query = text(file.read())
-        session.execute(query)
-    session.commit()
+        conn.execute(query)
+    conn.commit()
+
