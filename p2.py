@@ -1,6 +1,7 @@
 from database import engine
 from sqlalchemy import create_engine, text
 
+#Part 2
 #Inserts the seed data using the dummy_data sql file.
 #If you wish to restoore this data set, execute the code cluster below
 #table display uses sql statement and unions to display rows and tables.
@@ -37,5 +38,21 @@ with engine.connect() as conn:
     print("Displaying updated conferences: ")
     for row in con_upd:
         print(f"city: {row.city}  review deadline: {row.review_deadline}")
-    
 
+#part 4: Delete statements
+#Bound parameters used
+#Textual sql
+#We will demonstarate all of Amina's papers after deletion.
+#DELETEION is performed via nesting WHERE clauses
+#Retival is performed via JOIN clauses and is allowed to repeat
+#You could also execute * sql statements to confirm that every paper was deleted ON CASCADE
+
+email_amina = "amina.aminova@example.com"
+
+with engine.connect() as conn:
+    conn.execute(text("DELETE FROM PAPER p WHERE p.status = 'withdrawn' AND p.paper_id IN (SELECT pa.paper_id FROM PAPER_AUTHOR pa WHERE pa.author_id = (SELECT a.author_id FROM AUTHOR a WHERE author_id = (SELECT user_id FROM APP_USER WHERE email = :email)))"),  {"email" : email_amina})
+    result = conn.execute(text("SELECT u.email, p.status, pa.paper_id, pk.keyword, pv.version_no FROM PAPER p INNER JOIN PAPER_AUTHOR pa ON p.paper_id = pa.paper_id INNER JOIN PAPER_KEYWORD pk ON p.paper_id = pk.paper_id INNER JOIN PAPER_VERSION pv ON P.paper_id = pv.paper_id INNER JOIN AUTHOR a ON pa.author_id = a.author_id INNER JOIN APP_USER u ON a.author_id = u.user_id AND email = :email"), {"email" : email_amina})
+    conn.commit()
+    print("Displaying all the remaining papers from Amina:")
+    for row in result:
+        print(row)
