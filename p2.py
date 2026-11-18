@@ -61,3 +61,85 @@ with engine.connect() as conn:
         print(row)
     conn.execute(del_empty_sessions)
     conn.commit()
+
+#part 5: Simple queries
+#Bound parameters used
+#Textual sql
+#Each query is a plain SELECT, so nothing is committed here.
+
+#5.1 Accepted papers with their corresponding author, track and conference.
+#PAPER -> TRACK -> CONFERENCE gives the track name and conference ID/acronym.
+#PAPER_AUTHOR filtered by is_corresponding = true picks the corresponding author;
+#the unique index one_corresponding_per_paper guarantees at most one per paper, so we get one row per paper.
+#LEFT JOINs on the author side keep an accepted paper even if no corresponding author is set (author columns are then NULL).
+#The full name is built by joining given_name and surname with a space.
+q_accepted_papers = text("""
+    SELECT p.paper_id, p.title,
+           u.given_name || ' ' || u.surname AS corresponding_author, u.email,
+           t.track_name, c.conference_id, c.acronym
+    FROM PAPER p
+    INNER JOIN TRACK t ON p.track_id = t.track_id
+    INNER JOIN CONFERENCE c ON t.conference_id = c.conference_id
+    LEFT JOIN PAPER_AUTHOR pa ON pa.paper_id = p.paper_id AND pa.is_corresponding = true
+    LEFT JOIN APP_USER u ON u.user_id = pa.author_id
+    WHERE p.status = :status
+    ORDER BY p.paper_id
+""")
+
+#5.2 Papers whose abstract contains a phrase, case-insensitive.
+#ILIKE is PostgreSQL's case-insensitive LIKE; the % wildcards on both sides match the phrase anywhere in the abstract.
+#The wildcards are added in Python so the phrase itself stays a bound parameter.
+q_abstract_phrase = text("""
+    SELECT paper_id, title
+    FROM PAPER
+    WHERE abstract ILIKE :pattern
+    ORDER BY paper_id
+""")
+
+#5.3 All versions of a selected paper, newest version first.
+#PAPER_VERSION already holds everything we need, so no joins are required.
+#ORDER BY version_no DESC lists the highest version number first.
+q_paper_versions = text("""
+    SELECT version_no, file_location, uploaded_at
+    FROM PAPER_VERSION
+    WHERE paper_id = :paper_id
+    ORDER BY version_no DESC
+""")
+
+#5.4 Reviewers in a selected conference's pool with a given expertise and enough experience.
+#CONFERENCE_REVIEWER is the conference's reviewer pool; REVIEWER gives years_exp; APP_USER gives name and email.
+#Expertise is checked with EXISTS instead of a join, so a reviewer with several matching rows is still returned only once.
+#(CONFERENCE_REVIEWER's primary key (conference_id, reviewer_id) already prevents duplicates from the pool side.)
+q_conf_reviewers = text("""
+    SELECT r.reviewer_id, u.given_name || ' ' || u.surname AS full_name, u.email
+    FROM CONFERENCE_REVIEWER cr
+    INNER JOIN REVIEWER r ON cr.reviewer_id = r.reviewer_id
+    INNER JOIN APP_USER u ON r.reviewer_id = u.user_id
+    WHERE cr.conference_id = :conference_id
+      AND r.years_exp >= :min_years
+      AND EXISTS (SELECT 1 FROM REVIEWER_EXPERTISE re
+                  WHERE re.reviewer_id = r.reviewer_id AND re.area_label = :area)
+    ORDER BY r.reviewer_id
+""")
+
+#Parameters for the "selected" values; change these to query a different paper/conference.
+selected_paper_id = 1
+selected_conference_id = 1
+
+with engine.connect() as conn:
+    print("5.1 Accepted papers with corresponding author, track and conference:")
+    for row in conn.execute(q_accepted_papers, {"status": "accepted"}):
+        print(f"paper_id: {row.paper_id} title: {row.title} author: {row.corresponding_author} email: {row.email} "
+              f"track: {row.track_name} conference_id: {row.conference_id} acronym: {row.acronym}")
+
+    print("5.2 Papers whose abstract mentions 'machine learning':")
+    for row in conn.execute(q_abstract_phrase, {"pattern": "%machine learning%"}):
+        print(f"paper_id: {row.paper_id} title: {row.title}")
+
+    print(f"5.3 Versions of paper {selected_paper_id} (newest first):")
+    for row in conn.execute(q_paper_versions, {"paper_id": selected_paper_id}):
+        print(f"version: {row.version_no} file: {row.file_location} uploaded_at: {row.uploaded_at}")
+
+    print(f"5.4 Reviewers in conference {selected_conference_id}'s pool with Databases expertise and 3+ years of experience:")
+    for row in conn.execute(q_conf_reviewers, {"conference_id": selected_conference_id, "min_years": 3, "area": "Databases"}):
+        print(f"reviewer_id: {row.reviewer_id} name: {row.full_name} email: {row.email}")
