@@ -46,13 +46,18 @@ with engine.connect() as conn:
 #DELETEION is performed via nesting WHERE clauses
 #Retival is performed via JOIN clauses and is allowed to repeat
 #You could also execute * sql statements to confirm that every paper was deleted ON CASCADE
+#Deletes empty sessions (which no paper belongs to) specifically in Astana
+#since some of our rows in PAPER with can be NULL, we use NOT NULL clause specifically to prevent NOT IN generating 0 rows.
 
 email_amina = "amina.aminova@example.com"
+
+del_empty_sessions = text("DELETE FROM CONFERENCE_SESSION WHERE session_id NOT IN(SELECT session_id FROM PAPER WHERE session_id IS NOT NULL) AND conference_id IN (SELECT conference_id FROM CONFERENCE WHERE city = 'Astana')")
 
 with engine.connect() as conn:
     conn.execute(text("DELETE FROM PAPER p WHERE p.status = 'withdrawn' AND p.paper_id IN (SELECT pa.paper_id FROM PAPER_AUTHOR pa WHERE pa.author_id = (SELECT a.author_id FROM AUTHOR a WHERE author_id = (SELECT user_id FROM APP_USER WHERE email = :email)))"),  {"email" : email_amina})
     result = conn.execute(text("SELECT u.email, p.status, pa.paper_id, pk.keyword, pv.version_no FROM PAPER p INNER JOIN PAPER_AUTHOR pa ON p.paper_id = pa.paper_id INNER JOIN PAPER_KEYWORD pk ON p.paper_id = pk.paper_id INNER JOIN PAPER_VERSION pv ON P.paper_id = pv.paper_id INNER JOIN AUTHOR a ON pa.author_id = a.author_id INNER JOIN APP_USER u ON a.author_id = u.user_id AND email = :email"), {"email" : email_amina})
-    conn.commit()
     print("Displaying all the remaining papers from Amina:")
     for row in result:
         print(row)
+    conn.execute(del_empty_sessions)
+    conn.commit()
