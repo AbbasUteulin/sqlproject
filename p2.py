@@ -143,3 +143,70 @@ with engine.connect() as conn:
     print(f"5.4 Reviewers in conference {selected_conference_id}'s pool with Databases expertise and 3+ years of experience:")
     for row in conn.execute(q_conf_reviewers, {"conference_id": selected_conference_id, "min_years": 3, "area": "Databases"}):
         print(f"reviewer_id: {row.reviewer_id} name: {row.full_name} email: {row.email}")
+
+
+#part 7: Query with a derived attribute
+#Textual sql
+#acceptance_rate is a derived attribute: it is not stored anywhere, it is calculated from PAPER.status at query time.
+#CONFERENCE -> TRACK -> PAPER is joined with LEFT JOINs so that every conference is listed,
+#even one with no tracks or papers (e.g. conference 3 in dummy data); its padding rows have a NULL status.
+
+q_acceptance_rate = text("""
+    SELECT c.conference_id, c.acronym,
+           COUNT(*) FILTER (WHERE p.status = 'accepted') AS accepted_count,
+           COUNT(*) FILTER (WHERE p.status = 'rejected') AS rejected_count,
+           ROUND(100.0 * COUNT(*) FILTER (WHERE p.status = 'accepted')
+                 / NULLIF(COUNT(*) FILTER (WHERE p.status IN ('accepted', 'rejected')), 0), 2) AS acceptance_rate
+    FROM CONFERENCE c
+    LEFT JOIN TRACK t ON t.conference_id = c.conference_id
+    LEFT JOIN PAPER p ON p.track_id = t.track_id
+    GROUP BY c.conference_id, c.acronym
+    ORDER BY c.conference_id
+""")
+
+with engine.connect() as conn:
+    print("Part 7: Acceptance rate per conference:")
+    for row in conn.execute(q_acceptance_rate):
+        print(f"conference_id: {row.conference_id} acronym: {row.acronym} accepted: {row.accepted_count} "
+              f"rejected: {row.rejected_count} acceptance_rate: {row.acceptance_rate}")
+
+
+#part 8: View operation
+#Textual sql
+
+drop_schedule_view = text("DROP VIEW IF EXISTS accepted_paper_schedule")
+create_schedule_view = text("""
+    CREATE VIEW accepted_paper_schedule AS
+    SELECT p.paper_id, p.title AS paper_title,
+           c.conference_id, c.acronym, t.track_name,
+           s.session_id, s.title AS session_title, s.session_date, s.start_time, s.end_time, s.room_label,
+           ch.given_name || ' ' || ch.surname AS chair_name,
+           au.given_name || ' ' || au.surname AS corresponding_author, au.email AS corresponding_email
+    FROM PAPER p
+    INNER JOIN CONFERENCE_SESSION s ON p.session_id = s.session_id
+    INNER JOIN TRACK t ON p.track_id = t.track_id
+    INNER JOIN CONFERENCE c ON s.conference_id = c.conference_id
+    INNER JOIN APP_USER ch ON ch.user_id = s.chair_id
+    LEFT JOIN PAPER_AUTHOR pa ON pa.paper_id = p.paper_id AND pa.is_corresponding = true
+    LEFT JOIN APP_USER au ON au.user_id = pa.author_id
+    WHERE p.status = 'accepted'
+""")
+
+#The ordering is applied when querying the view, not inside it,
+#because PostgreSQL does not guarantee the row order of a view's result.
+q_schedule_view = text("""
+    SELECT * FROM accepted_paper_schedule
+    ORDER BY conference_id, session_date, start_time, session_id, paper_id
+""")
+
+with engine.connect() as conn:
+    conn.execute(drop_schedule_view)
+    conn.execute(create_schedule_view)
+    conn.commit()  #commit so the view definition persists in the database
+    print("Part 8: Accepted paper schedule (from view accepted_paper_schedule):")
+    for row in conn.execute(q_schedule_view):
+        print(f"conference_id: {row.conference_id} acronym: {row.acronym} track: {row.track_name} "
+              f"session_id: {row.session_id} session: {row.session_title} date: {row.session_date} "
+              f"time: {row.start_time}-{row.end_time} room: {row.room_label} chair: {row.chair_name} | "
+              f"paper_id: {row.paper_id} title: {row.paper_title} "
+              f"corresponding author: {row.corresponding_author} email: {row.corresponding_email}")
