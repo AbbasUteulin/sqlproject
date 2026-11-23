@@ -134,7 +134,7 @@ INSERT INTO PAPER (paper_id, track_id, title, abstract, submission_date, status,
 	(9,  1, 'Query Caching Revisited',
 	        'Revisiting result caching for analytical workloads.',                  '2026-02-05 13:00+05', 'withdrawn',    NULL),
 	(10, 4, 'Lightweight Contract Checking',
-	        'Runtime contract checks with negligible overhead.',                    '2026-04-15 17:40+05', 'withdrawn',    NULL);
+	        'Runtime contract checks with negligible overhead. Machine learning',                    '2026-04-15 17:40+05', 'withdrawn',    NULL);
 
 INSERT INTO PAPER_KEYWORD (paper_id, keyword) VALUES
 	(1, 'indexing'), (1, 'streaming'),
