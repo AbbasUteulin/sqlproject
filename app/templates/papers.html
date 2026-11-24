@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% from "_macros.html" import table %}
+{% block content %}
+<h2>Papers</h2>
+{{ table(rows, "/papers/") }}
+{% endblock %}
