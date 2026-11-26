@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{# Create/edit one paper with its authors, keywords and session (and the first version when creating).
+   app.save_paper saves all of it in one transaction. #}
+{% block content %}
+<h2>{% if paper_id %}Edit paper {{ paper_id }}{% else %}New paper{% endif %}</h2>
+<form method="post">
+  <p><label>Track
+    <select name="track_id">
+      <option value="">-- choose --</option>
+      {% for id, label in tracks %}<option value="{{ id }}" {% if id|string == f.track_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label></p>
+  <p><label>Title <input name="title" size="60" value="{{ f.title }}"></label></p>
+  <p><label>Abstract<br><textarea name="abstract" rows="4" cols="70">{{ f.abstract }}</textarea></label></p>
+  <p><label>Status
+    <select name="status">
+      {% for s in statuses %}<option value="{{ s }}" {% if s == f.status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select></label></p>
+  <p><label>Session
+    <select name="session_id">
+      <option value="">-- not scheduled --</option>
+      {% for id, label in sessions %}<option value="{{ id }}" {% if id|string == f.session_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+    <small>Only accepted papers, and only sessions of the paper's own conference (application check 2).</small></p>
+
+  <fieldset>
+    <legend>Authors (slot order = author position; pick the corresponding author on the right)</legend>
+    {% for slot in slots %}
+      {% set key = "author_" ~ slot %}
+      <p>{{ slot }}.
+        <select name="{{ key }}">
+          <option value="">-- none --</option>
+          {% for id, label in authors %}<option value="{{ id }}" {% if id|string == f[key] %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <label><input type="radio" name="corresponding" value="{{ slot }}" {% if f.corresponding == slot|string %}checked{% endif %}> corresponding</label>
+      </p>
+    {% endfor %}
+    <p><label><input type="radio" name="corresponding" value="" {% if not f.corresponding %}checked{% endif %}> no corresponding author</label></p>
+    <small>Only users with an author profile are listed. Someone who already reviewed this paper cannot be added (application check 1).</small>
+  </fieldset>
+
+  <p><label>Keywords (comma-separated) <input name="keywords" size="60" value="{{ f.keywords }}"></label></p>
+  {% if not paper_id %}
+  <p><label>First version file location (optional) <input name="file_location" size="40" value="{{ f.file_location }}"></label></p>
+  {% else %}
+  <p><small>New versions are added on the paper's page.</small></p>
+  {% endif %}
+
+  <button type="submit">Save</button>
+  <a href="{{ url_for('paper_detail', paper_id=paper_id) if paper_id else url_for('papers') }}">Cancel</a>
+</form>
+{% endblock %}

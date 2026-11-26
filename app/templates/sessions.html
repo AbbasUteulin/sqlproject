@@ -2,5 +2,6 @@
 {% from "_macros.html" import table %}
 {% block content %}
 <h2>Sessions</h2>
-{{ table(rows) }}
+<p><a href="/sessions/new">New session</a> (click an ID to view, edit or delete)</p>
+{{ table(rows, "/sessions/") }}
 {% endblock %}

@@ -2,5 +2,6 @@
 {% from "_macros.html" import table %}
 {% block content %}
 <h2>Reviews</h2>
-{{ table(rows) }}
+<p><a href="/reviews/new">New review</a> (click an ID to view, edit or delete)</p>
+{{ table(rows, "/reviews/") }}
 {% endblock %}

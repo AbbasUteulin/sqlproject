@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Session {{ sess.session_id }}: {{ sess.title }}</h2>
+<p>
+  <a href="{{ url_for('session_edit', session_id=sess.session_id) }}">Edit session</a>
+  <form method="post" action="{{ url_for('session_delete', session_id=sess.session_id) }}" style="display:inline"
+        onsubmit="return confirm('Delete this session? Its papers become unscheduled.');">
+    <button type="submit">Delete session</button></form>
+</p>
+<ul>
+  <li>Conference: {{ sess.acronym }}</li>
+  <li>Date and time: {{ sess.session_date }} {{ sess.start_time }}-{{ sess.end_time }}</li>
+  <li>Room: {{ sess.room_label }}</li>
+  <li>Chair: <a href="{{ url_for('user_detail', user_id=sess.chair_id) }}">{{ sess.chair }}</a></li>
+</ul>
+<h3>Scheduled papers</h3>
+<p><small>Papers are assigned to a session from the paper's edit form.</small></p>
+{% if papers %}
+<table border="1" cellpadding="4" cellspacing="0">
+  <tr><th>paper</th><th>title</th><th>status</th><th>track</th></tr>
+  {% for p in papers %}
+  <tr><td><a href="{{ url_for('paper_detail', paper_id=p.paper_id) }}">{{ p.paper_id }}</a></td>
+      <td>{{ p.title }}</td><td>{{ p.status }}</td><td>{{ p.track_name }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}<p>None.</p>{% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{# Create/edit one user. The author and reviewer profiles are part of the same form,
+   and app.save_user saves all of it in one transaction. #}
+{% block content %}
+<h2>{% if user_id %}Edit user {{ user_id }}{% else %}New user{% endif %}</h2>
+<form method="post">
+  <p><label>Given name <input name="given_name" value="{{ f.given_name }}"></label></p>
+  <p><label>Surname <input name="surname" value="{{ f.surname }}"></label></p>
+  <p><label>Email <input name="email" value="{{ f.email }}"></label></p>
+  <p><label>Affiliation <input name="affiliation" value="{{ f.affiliation }}"></label></p>
+  <p><label>Country <input name="country" value="{{ f.country }}"></label></p>
+  <p><label>Phone number <input name="phone_number" value="{{ f.phone_number }}"></label></p>
+
+  <fieldset>
+    <legend><label><input type="checkbox" name="is_author" {% if f.is_author %}checked{% endif %}> Author profile</label></legend>
+    <p><label>ORCID (optional, 16 digits) <input name="orcid" value="{{ f.orcid }}"></label></p>
+    <p>Research areas:
+      {% for label in labels %}
+        <label><input type="checkbox" name="areas" value="{{ label }}" {% if label in f.areas %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </p>
+  </fieldset>
+
+  <fieldset>
+    <legend><label><input type="checkbox" name="is_reviewer" {% if f.is_reviewer %}checked{% endif %}> Reviewer profile</label></legend>
+    <p><label>Years of reviewing experience <input type="number" name="years_exp" value="{{ f.years_exp }}"></label></p>
+    <p>Expertise:
+      {% for label in labels %}
+        <label><input type="checkbox" name="expertise" value="{{ label }}" {% if label in f.expertise %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </p>
+  </fieldset>
+  <p><small>Unticking a profile removes that role. The database refuses this while the user still
+     authors a paper / has reviews / is in a reviewer pool, and the reason is shown.</small></p>
+
+  <button type="submit">Save</button>
+  <a href="{{ url_for('user_detail', user_id=user_id) if user_id else url_for('users') }}">Cancel</a>
+</form>
+{% endblock %}
