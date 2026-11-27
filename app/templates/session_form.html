@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{# Create/edit one session. The database checks end > start and that the chair is in the
+   conference's reviewer pool; app.save_session re-checks every scheduled paper on edit. #}
+{% block content %}
+<h2>{% if session_id %}Edit session {{ session_id }}{% else %}New session{% endif %}</h2>
+<form method="post">
+  <p><label>Conference
+    <select name="conference_id">
+      <option value="">-- choose --</option>
+      {% for id, label in conferences %}<option value="{{ id }}" {% if id|string == f.conference_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label></p>
+  <p><label>Title <input name="title" size="40" value="{{ f.title }}"></label></p>
+  <p><label>Date <input type="date" name="session_date" value="{{ f.session_date }}"></label></p>
+  <p><label>Start <input type="time" name="start_time" value="{{ f.start_time }}"></label>
+     <label>End <input type="time" name="end_time" value="{{ f.end_time }}"></label></p>
+  <p><label>Room <input name="room_label" value="{{ f.room_label }}"></label></p>
+  <p><label>Chair
+    <select name="chair_id">
+      <option value="">-- choose --</option>
+      {% for id, label in chairs %}<option value="{{ id }}" {% if id|string == f.chair_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+    <small>The chair must be in the chosen conference's reviewer pool.</small></p>
+  <button type="submit">Save</button>
+  <a href="{{ url_for('session_detail', session_id=session_id) if session_id else url_for('sessions') }}">Cancel</a>
+</form>
+{% endblock %}

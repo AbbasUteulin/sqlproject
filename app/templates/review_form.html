@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{# Create/edit one review. app.save_review rejects a self-review (application check 1)
+   before writing; the database trigger self_review_trigger is the backup. #}
+{% block content %}
+<h2>{% if review_id %}Edit review {{ review_id }}{% else %}New review{% endif %}</h2>
+<form method="post">
+  <p><label>Paper
+    <select name="paper_id">
+      <option value="">-- choose --</option>
+      {% for id, label in papers %}<option value="{{ id }}" {% if id|string == f.paper_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label></p>
+  <p><label>Reviewer
+    <select name="reviewer_id">
+      <option value="">-- choose --</option>
+      {% for id, label in reviewers %}<option value="{{ id }}" {% if id|string == f.reviewer_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+    <small>A reviewer who is an author of the paper is rejected.</small></p>
+  <p><label>Overall score (1-5) <input type="number" name="overall_score" value="{{ f.overall_score }}"></label></p>
+  <p><label>Recommendation
+    <select name="recommendation">
+      {% for r in ["accept", "reject"] %}<option value="{{ r }}" {% if r == f.recommendation %}selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select></label></p>
+  <p><label>Comments for authors<br><textarea name="comments_for_authors" rows="4" cols="70">{{ f.comments_for_authors }}</textarea></label></p>
+  <p><label>Confidential comments (optional)<br><textarea name="confidential_comments" rows="3" cols="70">{{ f.confidential_comments }}</textarea></label></p>
+  <button type="submit">Save</button>
+  <a href="{{ url_for('review_detail', review_id=review_id) if review_id else url_for('reviews') }}">Cancel</a>
+</form>
+{% endblock %}

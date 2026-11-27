@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Review {{ review.review_id }}</h2>
+<p>
+  <a href="{{ url_for('review_edit', review_id=review.review_id) }}">Edit review</a>
+  <form method="post" action="{{ url_for('review_delete', review_id=review.review_id) }}" style="display:inline"
+        onsubmit="return confirm('Delete this review?');"><button type="submit">Delete review</button></form>
+</p>
+<ul>
+  <li>Paper: <a href="{{ url_for('paper_detail', paper_id=review.paper_id) }}">#{{ review.paper_id }} {{ review.paper_title }}</a></li>
+  <li>Reviewer: <a href="{{ url_for('user_detail', user_id=review.reviewer_id) }}">{{ review.reviewer }}</a></li>
+  <li>Overall score: {{ review.overall_score }}</li>
+  <li>Recommendation: {{ review.recommendation }}</li>
+  <li>Submitted: {{ review.review_submission_date }}</li>
+</ul>
+<p><strong>Comments for authors:</strong> {{ review.comments_for_authors }}</p>
+<p><strong>Confidential comments:</strong> {{ review.confidential_comments or "none" }}</p>
+{% endblock %}

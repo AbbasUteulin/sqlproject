@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>User {{ user.user_id }}: {{ user.given_name }} {{ user.surname }}</h2>
+<p>
+  <a href="{{ url_for('user_edit', user_id=user.user_id) }}">Edit user and profiles</a>
+  <form method="post" action="{{ url_for('user_delete', user_id=user.user_id) }}" style="display:inline"
+        onsubmit="return confirm('Delete this user?');"><button type="submit">Delete user</button></form>
+</p>
+<ul>
+  <li>Email: {{ user.email }}</li>
+  <li>Affiliation: {{ user.affiliation }}</li>
+  <li>Country: {{ user.country }}</li>
+  <li>Phone: {{ user.phone_number }}</li>
+</ul>
+
+<h3>Author profile</h3>
+{% if author %}
+  <p>ORCID: {{ author.orcid or "none" }}</p>
+  <p>Research areas: {% for a in areas %}{{ a.area_label }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}</p>
+  <h4>Papers</h4>
+  {% if papers %}
+  <table border="1" cellpadding="4" cellspacing="0">
+    <tr><th>paper</th><th>title</th><th>status</th><th>position</th><th>corresponding</th></tr>
+    {% for p in papers %}
+    <tr><td><a href="{{ url_for('paper_detail', paper_id=p.paper_id) }}">{{ p.paper_id }}</a></td>
+        <td>{{ p.title }}</td><td>{{ p.status }}</td><td>{{ p.author_position }}</td>
+        <td>{{ "yes" if p.is_corresponding else "" }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p>None.</p>{% endif %}
+{% else %}
+  <p>Not an author.</p>
+{% endif %}
+
+<h3>Reviewer profile</h3>
+{% if reviewer %}
+  <p>Years of experience: {{ reviewer.years_exp }}</p>
+  <p>Expertise: {% for e in expertise %}{{ e.area_label }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}</p>
+  <p>Reviewer pools (read-only seed data): {% for c in pools %}{{ c.acronym }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}</p>
+  <h4>Reviews</h4>
+  {% if reviews %}
+  <table border="1" cellpadding="4" cellspacing="0">
+    <tr><th>review</th><th>paper</th><th>title</th><th>score</th><th>recommendation</th></tr>
+    {% for r in reviews %}
+    <tr><td><a href="{{ url_for('review_detail', review_id=r.review_id) }}">{{ r.review_id }}</a></td>
+        <td>{{ r.paper_id }}</td><td>{{ r.title }}</td><td>{{ r.overall_score }}</td><td>{{ r.recommendation }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p>None.</p>{% endif %}
+{% else %}
+  <p>Not a reviewer.</p>
+{% endif %}
+{% endblock %}
