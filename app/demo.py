@@ -6,13 +6,20 @@
 #
 # WARNING: it rebuilds the database from the seed data at the start AND at the end (resetdb.py),
 # so any data you typed into the web app is replaced by the seed data.
+# That is why it refuses to run against the deployed cloud database (only against this computer),
+# unless --allow-remote is given on purpose.
 import html
 import re
 import sys
 from sqlalchemy import text
-from db import engine
+from db import engine, is_local_database
 from resetdb import reset_database
 import app as webapp
+
+if not is_local_database() and "--allow-remote" not in sys.argv:
+    sys.exit(f"Refusing to run: DATABASE_URL points at {engine.url.host}, not this computer.\n"
+             "demo.py erases the database, so run it against the local Docker database instead.\n"
+             "(Add --allow-remote only if you really want to wipe that database.)")
 
 client = webapp.app.test_client()
 FLASH = re.compile(r'<div class="flash (\w+)"><strong>\w+:</strong> (.*?)</div>', re.S)

@@ -101,7 +101,7 @@ Progress:
 - [x] Chunk 2: read pages for users, papers, reviews and sessions
 - [x] Chunk 3: create, update and delete
 - [x] Chunk 4: the two application checks (self-review, session assignment) with transactions
-- [ ] Chunk 5: deployment, links.txt (the local demo is done: `app/demo.py`)
+- [ ] Chunk 5: deployment (code and instructions ready, see "Deployment" below; tick when the URL is live and in `links.txt`)
 
 ## Running it locally
 ```
@@ -174,3 +174,49 @@ The same scenarios by hand in the browser, after `python app/resetdb.py`:
 2. **Invalid session assignment:** Papers → 3 → Edit → Session "CASEF 2026 / #4 ..." → Save. The error says the paper and session belong to different conferences.
 3. **Invalid session assignment:** Papers → 6 → Edit → Session "ADSC 2026 / #1 ..." → Save. The error says only accepted papers can be scheduled.
 4. **Valid assignment:** Papers → 3 → Edit → Session "ADSC 2026 / #3 Open Problems" → Save. The paper is now shown in session 3.
+## Deployment
+The app runs on **Render** (free web service) and stores its data in **Neon** (free PostgreSQL). The URL is in `links.txt`.
+
+Why these two:
+- **Neon's free storage is persistent and doesn't expire** (1 GB per project). Render's own free PostgreSQL is deleted after 30 days, which could fall in the middle of grading.
+- **Render's free web service** sleeps after 15 minutes without traffic and takes about a minute to wake up. An uptime monitor pings `/health` every 5 minutes so it stays awake. `/health` does not query the database, so Neon can still scale to zero when idle and stays well inside its 100 compute-hours a month.
+
+### One-time setup
+1. **Neon** (neon.tech): create a project, then copy the **direct** connection string (the host without `-pooler`), e.g. `postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require`.
+2. **Seed it once** from your own computer. `resetdb.py` asks you to type `yes` because the host is not local:
+   ```powershell
+   $env:DATABASE_URL = "<neon connection string>"
+   python app/resetdb.py
+   ```
+3. **Render** (render.com): New → Web Service → this GitHub repo, with these settings:
+
+   | setting | value |
+   |---|---|
+   | Branch | `main` |
+   | Root Directory | `app` |
+   | Runtime | Python |
+   | Build Command | `pip install -r requirements.txt` |
+   | Start Command | `gunicorn app:app` |
+   | Instance Type | Free |
+   | Environment | `DATABASE_URL` = Neon connection string, `SECRET_KEY` = any long random string, `PYTHON_VERSION` = `3.12.10` |
+4. **UptimeRobot** (uptimerobot.com, free): add an HTTP(s) monitor on `https://<service>.onrender.com/health`, checking every 5 minutes, with email alerts on.
+5. Put the URL into `links.txt`.
+
+The Part 2 programs (`p2.py`, `p2n.py`) stay separate and still run locally against Docker.
+
+### Keeping it available during grading
+- **Don't erase the live data.**
+  - `demo.py` refuses to run against a non-local database.
+  - Run `resetdb.py` against Neon only before grading starts, or if the data is badly broken. It wipes the graders' changes.
+- **Don't break the deploy.**
+  - Render redeploys on every push to `main`, so only merge tested changes during grading, or turn off Auto-Deploy in the Render settings.
+  - After a deploy, check Render → Logs and open the site.
+- **Watch the free limits.**
+  - Render's 750 free hours a month are shared by all free services in the same Render workspace, and one service running 24/7 needs about 744. Don't run other free services in that workspace.
+  - Neon: glance at the Usage page now and then.
+- **If it goes down:**
+  - UptimeRobot emails you.
+  - Check Render → Logs, then Manual Deploy → Restart service.
+  - Check Neon's dashboard, in case compute was suspended.
+  - If the monitor missed a ping, the first request after a sleep takes about a minute.
+- **Before grading:** open the URL in a private window, click through users, papers, reviews and sessions, and check that `/health` shows `ok`.

@@ -97,6 +97,15 @@ def index():
     return render_template("index.html", **counts)
 
 
+@app.get("/health")
+def health():
+    """For the uptime monitor that pings the deployed site every 5 minutes so the free web server
+    never falls asleep. It deliberately does NOT query the database: the free cloud database scales
+    to zero when idle, and a query every 5 minutes would keep it awake 24/7 and use up its monthly
+    compute allowance."""
+    return "ok"
+
+
 # =====================================================================================
 # USERS (the author and reviewer profiles are managed inside the user form)
 # =====================================================================================
