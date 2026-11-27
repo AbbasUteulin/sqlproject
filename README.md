@@ -1,6 +1,95 @@
 # sqlproject
 An sql project repository containing all parts from the ASSIGNMENT 3 of CSCI-341.
 
+## Software Versions
+The project was developed and tested with the following software versions. 
+
+| Component | Version Used | Verification Command |
+| :--- | :--- | :--- |
+| **Python** | 3.14.7 | `python --version` |
+| **PostgreSQL** | 18.7 | `psql -h localhost -p 5431 -U postgres -c "SHOW server_version;"` |
+| **Flask** | 3.1.3 | `python -c "import importlib.metadata; print(importlib.metadata.version('flask'))"` |
+| **SQLAlchemy** | 2.0.45 | `python -c "import sqlalchemy; print(sqlalchemy.__version__)"` |
+| **psycopg2-binary** | 2.9.13 | `python -m pip show psycopg2-binary` |
+| **python-dotenv** | 1.2.1 | `python -c "import importlib.metadata; print(importlib.metadata.version('python-dotenv'))"` |
+
+
+## How to Run the SQL Queries (Part 2)
+Run from the repository root with PostgreSQL running and `database.py` pointing at it:
+ 
+```
+python p2.py      # tasks 1-5, 7, 8
+python p2n.py     # task 6
+```
+ 
+Every run first rebuilds the schema (import of `database.py`) and loads `dummy_data.sql`, so each program starts from the original seed data. `database.py` sets `echo=True`, so SQLAlchemy prints every SQL statement (including the schema and the seed file) before the results. Task labels are in the printed headings.
+
+## How to Run the Application (Part 3)
+```
+pip install -r app/requirements.txt
+# set the connection (see 3.1), for example in PowerShell:
+$env:DATABASE_URL = "postgresql://postgres:mysecretpassword@localhost:5431/postgres"
+python app/resetdb.py     # once: schema + seed data (erases existing data)
+python app/app.py         # Flask development server, debug mode: http://127.0.0.1:5000
+```
+ 
+The web app only connects (`app/db.py`); it never rebuilds the database. Restarting it keeps your data. Stop it with `Ctrl+C`.
+
+
+## Database Schema and Keys 
+Types: integer keys, `varchar(n)`/`text` for text, `timestamptz` for conference dates, deadlines, submission, upload and review dates; `date`/`time` for sessions. `PAPER.session_id` is NULL when the paper is not scheduled. "No action" below means the default `NO ACTION` (the delete is rejected while referenced).
+ 
+| Table | Primary key | Foreign keys (delete action) | Notes |
+|---|---|---|---|
+| `APP_USER` | `user_id` | | `email` UNIQUE NOT NULL |
+| `AUTHOR` | `author_id` | `author_id` → `APP_USER` (CASCADE) | `orcid` optional, UNIQUE |
+| `AUTHOR_RESEARCH_AREA` | `(author_id, area_label)` | → `AUTHOR` (CASCADE) | multivalued attribute |
+| `REVIEWER` | `reviewer_id` | → `APP_USER` (CASCADE) | `years_exp` CHECK >= 0 |
+| `REVIEWER_EXPERTISE` | `(reviewer_id, area_label)` | → `REVIEWER` (CASCADE) | multivalued attribute |
+| `CONFERENCE` | `conference_id` | | CHECK end_date >= start_date; CHECK submission_deadline <= review_deadline |
+| `CONFERENCE_HOST` | `(conference_id, host_name)` | → `CONFERENCE` (CASCADE) | |
+| `CONFERENCE_REVIEWER` | `(conference_id, reviewer_id)` | → `CONFERENCE` (CASCADE); → `REVIEWER` (no action) | the conference's reviewer pool |
+| `TRACK` | `track_id` | `conference_id` → `CONFERENCE` (CASCADE); `coordinator_id` → `REVIEWER` (no action); `(conference_id, coordinator_id)` → `CONFERENCE_REVIEWER` (no action) | the composite key forces the coordinator into the conference's pool |
+| `CONFERENCE_SESSION` | `session_id` | `conference_id` → `CONFERENCE` (CASCADE); `chair_id` → `REVIEWER` (no action); `(conference_id, chair_id)` → `CONFERENCE_REVIEWER` (no action) | CHECK end_time > start_time; chair must be in the pool |
+| `PAPER` | `paper_id` | `track_id` → `TRACK` (no action); `session_id` → `CONFERENCE_SESSION` (SET NULL) | CHECK status in (submitted, under review, accepted, rejected, withdrawn); CHECK `scheduled_only_if_accepted` |
+| `PAPER_KEYWORD` | `(paper_id, keyword)` | → `PAPER` (CASCADE) | |
+| `PAPER_AUTHOR` | `(paper_id, author_id)` | → `PAPER` (CASCADE); `author_id` → `AUTHOR` (no action) | `UNIQUE (paper_id, author_position)`, CHECK position > 0, `is_corresponding`; partial unique index `one_corresponding_per_paper` |
+| `PAPER_VERSION` | `(paper_id, version_no)` | → `PAPER` (CASCADE) | CHECK version_no > 0; `uploaded_at` default `now()`; gaps allowed, highest number = current version |
+| `REVIEW` | `review_id` | → `PAPER` (CASCADE); `reviewer_id` → `REVIEWER` (no action) | `UNIQUE (paper_id, reviewer_id)`; CHECK score 1-5; CHECK recommendation in (accept, reject); all fields except `confidential_comments` NOT NULL (completed reviews only); trigger `self_review_trigger` |
+ 
+**Deletion actions:** deleting a paper removes its authorship, keywords, versions and reviews; deleting a session unschedules its papers; deleting a conference removes its hosts, pool, tracks and sessions (cascade) but is rejected while a track still has papers (`PAPER.track_id`); users/reviewers are never deleted by a conference delete; deleting a user removes the author/reviewer profile rows but is rejected while the user authors a paper, wrote a review, is in a pool, coordinates a track or chairs a session. Foreign keys are never disabled. The web app has no conference delete, so the conference rule follows from the foreign-key definitions only.
+
+
+## Required Checks and Validation
+ 
+### Required database constraints (enforced by `sql1.sql`) 
+| Requirement | Mechanism | How to check it manually (psql, run inside `BEGIN; ... ROLLBACK;`) | Expected result |
+|---|---|---|---|
+| Unique author position within a paper | `UNIQUE (paper_id, author_position)` | `INSERT INTO PAPER_AUTHOR VALUES (1, 4, 1, false);` | duplicate key `paper_author_unique` |
+| Positive author position | CHECK `positive_author_pos` | `INSERT INTO PAPER_AUTHOR VALUES (1, 4, 0, false);` | check violation |
+| Score 1-5 | CHECK `one_to_five` | insert a `REVIEW` with `overall_score = 6` | check violation |
+| Paper must be accepted to be scheduled | CHECK `scheduled_only_if_accepted` | `UPDATE PAPER SET session_id = 1 WHERE paper_id = 6;` | check violation |
+| Chair/coordinator in the conference's pool | composite foreign keys | insert a `CONFERENCE_SESSION` for conference 1 with `chair_id = 9` | foreign-key violation `conference_session_conference_id_chair_id_fkey` |
+| Delete a paper cascades | `ON DELETE CASCADE` | `DELETE FROM PAPER WHERE paper_id = 1;` then count versions and reviews of paper 1 | 0 and 0 |
+ 
+Other required constraints (keys, NOT NULL, unique email, one review per reviewer and paper, status/recommendation checks, experience >= 0, conference and session time checks, positive version numbers) are defined in `sql1.sql`. They are exercised only indirectly (through the web forms and error translation); **no automated test for them is in the repository.**
+ 
+### Required application checks (Part 1)
+| Check | Implemented in | Rejected case | Expected result |
+|---|---|---|---|
+| 1. No self-review, when saving a review | `save_review` calls `checks.is_self_review`; the database trigger `self_review_trigger` is a backup | Arman Armanov (author of paper 1) reviews paper 1 | error message, no review stored |
+| 1. No self-review, when changing a paper's authors | `save_paper` calls `checks.author_has_reviewed_paper` | add Aliya Nurlanova (reviewer of paper 1) as an author of paper 1 | error message, authorship unchanged |
+| 2. Valid session assignment | `save_paper` calls `checks.session_assignment_error` (paper must be accepted; paper's track conference = session's conference), using the paper's new status and track | paper 3 (ADSC) into session 4 (CASEF); paper 6 (under review) into session 1 | error message, whole form rolled back (title change included) |
+| 2. Re-check when a session changes | `save_session` calls `checks.scheduled_paper_error` for every paper in the session | move session 1 (holds ADSC paper 1) to CASEF | edit rejected |
+ 
+**How to perform:** automatically with `python app/demo.py` (all cases above print `PASS` and verify the database did not change), or manually in the browser after `python app/resetdb.py`:
+ 
+1. Reviews > New review > paper 1, reviewer Arman Armanov > Save: error, no review added.
+2. Papers > 3 > Edit > session "CASEF 2026 / #4 ..." > Save: error that paper and session belong to different conferences.
+3. Papers > 6 > Edit > session "ADSC 2026 / #1 ..." > Save: error that only accepted papers can be scheduled.
+4. Papers > 3 > Edit > session "ADSC 2026 / #3 Open Problems" > Save: accepted, the paper is shown in session 3.
+**Code vs manual:** all four application checks are implemented in code (`app/checks.py`, called from `app/app.py`) and tested by `app/demo.py`. The database-level constraints are checked manually. The database alone does **not** enforce "same conference" (psql: `UPDATE PAPER SET session_id = 4 WHERE paper_id = 2;` succeeds) or the second direction of the self-review rule (inserting a reviewer who already reviewed the paper into `PAPER_AUTHOR` succeeds); those depend on the application checks.
+
 # PART 2
 
 Up until now, the part 1 of the task 2 .py file was using textual sql to execute commands. The documentation states that's not how sqlalchemy is usually operated, so in part 2 of the task 2 I am intending to use the Core way to work with it. The final deployed application may benefit from an ORM approach, but it is yet to be discussed. 
